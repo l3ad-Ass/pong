@@ -1,0 +1,14 @@
+*{
+    padding: 0px;
+    margin:0px;
+}
+body{
+    -webkit-touch-callout: none;
+    overflow: hidden;
+    -webkit-text-size-adjust: none;
+    -webkit-user-select: none;
+}
+#screen{
+    z-index: 1;
+    width: 100%;
+}
