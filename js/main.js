@@ -64,6 +64,12 @@ function animate() {
 	requestAnimationFrame(animate);
 }
 //Global functions
+//Computer Speed changin function
+function setComputerLevel(level) {
+	if(level<=0.2){
+			computerLevel=level;
+	}
+}
 
 //Collision Square and circle
 function intersects(circle, rect) {
@@ -143,6 +149,11 @@ function Ball(ground, players) {
 	// 	this.velocityX = -0.5;
 	// 	this.velocityY = -0.5;
 	//
+	this.setSpeed=function(newSpeed){
+		if(newSpeed<players[0].width-0.1){
+			this.speed=newSpeed;
+		}
+	};
 	this.draw = function() {
 		ctx.beginPath();
 		ctx.fillStyle = this.color;
@@ -181,10 +192,14 @@ function Ball(ground, players) {
 		//Logic for Wall bounce
 		//Right and Left respectively
 		if (this.x + this.radius >= ground.x + ground.width || this.x - this.radius <= ground.x) {
+			let direction = (this.x<canvas.width/2)?1:-1;
+			this.x=(direction==1)?ground.x+1:ground.x+ground.width-1;
 			this.velocityX *= -1;
 		}
 		//Bottom and Top respectively
 		if (this.y + this.radius >= ground.y + ground.height || this.y - this.radius <= ground.y) {
+			let direction = (this.y<canvas.height/2)?1:-1;
+			this.y=(direction==1)?ground.y+this.radius+1:ground.y+ground.height-(this.radius+1);
 			this.velocityY *= -1;
 		}
 
@@ -198,7 +213,8 @@ function Ball(ground, players) {
 				let direction = player.number == 1 ? 1 : -1;
 				this.velocityX = direction * this.speed * Math.cos(angleRad);
 				this.velocityY = this.speed * Math.sin(angleRad);
-				this.speed += 0.1;
+				this.setSpeed(this.speed+0.1);
+				setComputerLevel(computerLevel+0.001);
 			}
 		}
 		//Point logic
@@ -226,8 +242,8 @@ function Ball(ground, players) {
 function Player(number, ground) {
 	this.x;
 	this.y;
-	this.width = ground.height*0.03;
-	this.height = ground.height*0.15;
+	this.width = ground.height*0.05;
+	this.height = ground.height*0.25;
 	this.speed=3;
 	this.number = number;
 	this.score = 0;
