@@ -1,5 +1,5 @@
 //Global variable declaration
-var canvas, ctx, animateInterval,computerLevel , isPaused, b, g, p1, p2;
+var canvas, ctx, animateInterval, computerLevel, isPaused, b, g, p1, p2, DY, goTo;
 
 //Init function
 function init(e) {
@@ -8,27 +8,38 @@ function init(e) {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	isPaused = true;
-	computerLevel=0.1;
+	computerLevel = 0.1;
 	g = new Ground(100, '#00f000');
 
 	p1 = new Player(1, g);
 	p2 = new Player(2, g);
-
+	goTo = p1.y;
 	b = new Ball(g, [ p1, p2 ]);
 
 	animateInterval = requestAnimationFrame(animate);
 
 	//Listners
-	//Pause and Start Listner
-	window.onclick = function() {
-		isPaused = !isPaused;
-	};
-
 	//Controles
 	window.onmousemove = function(e) {
-		p1.update(e.clientY);
+		//p1.update(e.clientY);
 	};
-	
+
+	//Keyboard Controls
+	window.onkeydown = (e) => {
+		//Toggle start on space bar or enter
+		if (e.keyCode == 32 || e.keyCode == 13) {
+			toggleStart();
+		}
+		if (!isPaused) {
+			DY = e.keyCode == 38 || e.keyCode == 87 ? -1 : e.keyCode == 40 || e.keyCode == 83 ? 1 : 0;
+		}
+	};
+	window.onkeyup = (e) => {
+		if (e.keyCode == 38 || e.keyCode == 87 || e.keyCode == 40 || e.keyCode == 83) {
+			DY = 0;
+		}
+	};
+
 	//Resize adjustment
 
 	window.onresize = resize;
@@ -36,7 +47,7 @@ function init(e) {
 	function resize(e) {
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
-		isPaused=true;
+		isPaused = true;
 		g.reset();
 		b.reset();
 		p1.reset();
@@ -57,34 +68,39 @@ function animate() {
 	//Update Calls
 	if (!isPaused) {
 		b.update();
-		p2.update(p2.y+(b.y-(p2.y))*computerLevel);
+		p1.update(p1.y + DY * computerLevel * 50);
+		p2.update(p2.y + (b.y - p2.y) * computerLevel);
 	}
 
 	//Recurr animate function
 	requestAnimationFrame(animate);
 }
 //Global functions
+
+function toggleStart() {
+	isPaused = !isPaused;
+}
+
 //Computer Speed changin function
 function setComputerLevel(level) {
-	if(level<=0.2){
-			computerLevel=level;
+	if (level <= 0.2) {
+		computerLevel = level;
 	}
 }
 
 //Collision Square and circle
 function intersects(circle, rect) {
-	
 	var circleDistance = {};
 	circleDistance.x = Math.abs(circle.x - rect.x);
 	circleDistance.y = Math.abs(circle.y - rect.y);
-	
+
 	if (circleDistance.x > rect.width / 2 + circle.radius) {
 		return false;
 	}
 	if (circleDistance.y > rect.height / 2 + circle.radius) {
 		return false;
 	}
-	
+
 	if (circleDistance.x <= rect.width / 2) {
 		return true;
 	}
@@ -100,9 +116,9 @@ function intersects(circle, rect) {
 //Ground class
 function Ground(margin, color) {
 	this.margin = margin;
-	this.x = (window.innerWidth-200>=800)?(window.innerWidth-800)/2:margin;
+	this.x = window.innerWidth - 200 >= 800 ? (window.innerWidth - 800) / 2 : margin;
 	this.y = margin;
-	this.width = (window.innerWidth-200>=800)?800:window.innerWidth - 2 * margin;
+	this.width = window.innerWidth - 200 >= 800 ? 800 : window.innerWidth - 2 * margin;
 	this.height = window.innerHeight - 2 * margin;
 	this.color = color;
 	this.draw = function() {
@@ -111,29 +127,29 @@ function Ground(margin, color) {
 		ctx.rect(this.x, this.y, this.width, this.height);
 		ctx.stroke();
 		ctx.fill();
-		ctx.font = "100px Comic Sans M";
-		ctx.fillStyle=this.color;
-		ctx.textAlign='center';
+		ctx.font = '100px Comic Sans M';
+		ctx.fillStyle = this.color;
+		ctx.textAlign = 'center';
 		ctx.closePath();
 		ctx.beginPath();
 		ctx.fillStyle = '#ffffff';
-		for(var i=this.y-100;i<=this.height+100;i+=15){
-			ctx.rect(this.x+this.width/2-2,i+10,4,10);
+		for (var i = this.y - 100; i <= this.height + 100; i += 15) {
+			ctx.rect(this.x + this.width / 2 - 2, i + 10, 4, 10);
 		}
 		ctx.fill();
-		ctx.fillText('PONG', this.x+this.width/2,this.margin+this.height-20);
+		ctx.fillText('PONG', this.x + this.width / 2, this.margin + this.height - 20);
 	};
-	this.reset=function(){
-		this.height = (window.innerHeight<=500)?300: window.innerHeight - 2 * margin;
-		this.x = (window.innerWidth-200>=800)?(window.innerWidth-800)/2:margin;
-		this.width=(window.innerWidth-200>=800)?800:((window.innerWidth<=500)?300:window.innerWidth - 2 * margin);
-
+	this.reset = function() {
+		this.height = window.innerHeight <= 500 ? 300 : window.innerHeight - 2 * margin;
+		this.x = window.innerWidth - 200 >= 800 ? (window.innerWidth - 800) / 2 : margin;
+		this.width =
+			window.innerWidth - 200 >= 800 ? 800 : window.innerWidth <= 500 ? 300 : window.innerWidth - 2 * margin;
 	};
 }
 
 //Ball class
 function Ball(ground, players) {
-	this.radius = ground.height*0.03;
+	this.radius = ground.height * 0.03;
 	this.x = ground.x + ground.width / 2;
 	this.y = ground.y + ground.height / 2;
 	this.speed = 5;
@@ -149,9 +165,9 @@ function Ball(ground, players) {
 	// 	this.velocityX = -0.5;
 	// 	this.velocityY = -0.5;
 	//
-	this.setSpeed=function(newSpeed){
-		if(newSpeed<players[0].width-0.1){
-			this.speed=newSpeed;
+	this.setSpeed = function(newSpeed) {
+		if (newSpeed < players[0].width - 0.1) {
+			this.speed = newSpeed;
 		}
 	};
 	this.draw = function() {
@@ -192,14 +208,14 @@ function Ball(ground, players) {
 		//Logic for Wall bounce
 		//Right and Left respectively
 		if (this.x + this.radius >= ground.x + ground.width || this.x - this.radius <= ground.x) {
-			let direction = (this.x<canvas.width/2)?1:-1;
-			this.x=(direction==1)?ground.x+1:ground.x+ground.width-1;
+			let direction = this.x < canvas.width / 2 ? 1 : -1;
+			this.x = direction == 1 ? ground.x + 1 : ground.x + ground.width - 1;
 			this.velocityX *= -1;
 		}
 		//Bottom and Top respectively
 		if (this.y + this.radius >= ground.y + ground.height || this.y - this.radius <= ground.y) {
-			let direction = (this.y<canvas.height/2)?1:-1;
-			this.y=(direction==1)?ground.y+this.radius+1:ground.y+ground.height-(this.radius+1);
+			let direction = this.y < canvas.height / 2 ? 1 : -1;
+			this.y = direction == 1 ? ground.y + this.radius + 1 : ground.y + ground.height - (this.radius + 1);
 			this.velocityY *= -1;
 		}
 
@@ -213,8 +229,8 @@ function Ball(ground, players) {
 				let direction = player.number == 1 ? 1 : -1;
 				this.velocityX = direction * this.speed * Math.cos(angleRad);
 				this.velocityY = this.speed * Math.sin(angleRad);
-				this.setSpeed(this.speed+0.1);
-				setComputerLevel(computerLevel+0.001);
+				this.setSpeed(this.speed + 0.1);
+				setComputerLevel(computerLevel + 0.001);
 			}
 		}
 		//Point logic
@@ -224,7 +240,6 @@ function Ball(ground, players) {
 				players[1].score++;
 			} else {
 				players[0].score++;
-				
 			}
 			this.reset();
 		}
@@ -232,7 +247,7 @@ function Ball(ground, players) {
 	this.reset = function() {
 		this.x = ground.x + ground.width / 2;
 		this.y = ground.y + ground.height / 2;
-		this.speed = 5	;
+		this.speed = 5;
 		this.velocityX = this.speed;
 		this.velocityY = 0;
 	};
@@ -242,9 +257,9 @@ function Ball(ground, players) {
 function Player(number, ground) {
 	this.x;
 	this.y;
-	this.width = ground.height*0.05;
-	this.height = ground.height*0.25;
-	this.speed=3;
+	this.width = ground.height * 0.05;
+	this.height = ground.height * 0.25;
+	this.speed = 3;
 	this.number = number;
 	this.score = 0;
 	this.color;
@@ -266,27 +281,26 @@ function Player(number, ground) {
 		ctx.fill();
 	};
 	this.update = function(newY) {
-		
-		if(newY-this.height/2>ground.y&&newY+this.height/2<ground.y+ground.height){	
-			this.y=newY;
-		}else if(newY-this.height/2<=ground.y){
-			this.y=ground.y+this.height/2;
-		}else if(newY+this.height/2>=ground.y+ground.height){
-			this.y=ground.y+ground.height-this.height/2;
+		if (newY - this.height / 2 > ground.y && newY + this.height / 2 < ground.y + ground.height) {
+			this.y = newY;
+		} else if (newY - this.height / 2 <= ground.y) {
+			this.y = ground.y + this.height / 2;
+		} else if (newY + this.height / 2 >= ground.y + ground.height) {
+			this.y = ground.y + ground.height - this.height / 2;
 		}
 	};
-	this.drawScore=function(){
-		ctx.font = "100px Comic Sans M";
-		ctx.fillStyle='#ffffff';
-		ctx.textAlign='center';
-		if(this.number==1){
-			ctx.fillText(this.score,ground.x+ ground.width/4, ground.margin*2);
-		}else{
-			ctx.fillText(this.score, ground.x+3*ground.width/4, ground.margin*2);
+	this.drawScore = function() {
+		ctx.font = '100px Comic Sans M';
+		ctx.fillStyle = '#ffffff';
+		ctx.textAlign = 'center';
+		if (this.number == 1) {
+			ctx.fillText(this.score, ground.x + ground.width / 4, ground.margin * 2);
+		} else {
+			ctx.fillText(this.score, ground.x + 3 * ground.width / 4, ground.margin * 2);
 		}
 	};
-	this.reset=function(){
-		this.height = ground.height*0.15;
+	this.reset = function() {
+		this.height = ground.height * 0.15;
 		if (this.number == 1) {
 			this.x = ground.x + this.width / 2 + 2;
 			this.y = ground.height / 2 + ground.margin + this.height / 2 - this.height / 2;
