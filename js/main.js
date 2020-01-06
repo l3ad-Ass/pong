@@ -8,8 +8,8 @@ function init(e) {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	isPaused = true;
-	computerLevel = 0.1;
 	g = new Ground(100, '#00f000');
+	computerLevel = (g.width/g.height)/10;
 
 	p1 = new Player(1, g);
 	p2 = new Player(2, g);
@@ -21,19 +21,14 @@ function init(e) {
 	//Listners
 	//Controles
 	window.onmousemove = function(e) {
-		//p1.update(e.clientY);
+		if(AI.isTraining){
+			p1.update(e.clientY);
+		}	
+	
 	};
 
 	//Keyboard Controls
-	window.onkeydown = (e) => {
-		//Toggle start on space bar or enter
-		if (e.keyCode == 32 || e.keyCode == 13) {
-			toggleStart();
-		}
-		if (!isPaused) {
-			DY = e.keyCode == 38 || e.keyCode == 87 ? -1 : e.keyCode == 40 || e.keyCode == 83 ? 1 : 0;
-		}
-	};
+	window.onkeydown = onKeyDown;
 	window.onkeyup = (e) => {
 		if (e.keyCode == 38 || e.keyCode == 87 || e.keyCode == 40 || e.keyCode == 83) {
 			DY = 0;
@@ -53,6 +48,14 @@ function init(e) {
 		p1.reset();
 		p2.reset();
 	}
+
+
+
+
+	//ML initilization call
+	initML();
+
+
 }
 //Animation loop
 function animate() {
@@ -77,13 +80,24 @@ function animate() {
 }
 //Global functions
 
+function onKeyDown(e){
+	//Toggle start on space bar or enter
+	if (!isPaused) {
+		DY = e.keyCode == 38 || e.keyCode == 87 ? -1 : e.keyCode == 40 || e.keyCode == 83 ? 1 : 0;
+	}
+	if (e.keyCode == 32 || e.keyCode == 13) {
+		toggleStart();
+	}
+}
+
+//Pause and play
 function toggleStart() {
 	isPaused = !isPaused;
 }
 
 //Computer Speed changin function
 function setComputerLevel(level) {
-	if (level <= 0.2) {
+	if (level <= 0.15) {
 		computerLevel = level;
 	}
 }
@@ -152,7 +166,7 @@ function Ball(ground, players) {
 	this.radius = ground.height * 0.03;
 	this.x = ground.x + ground.width / 2;
 	this.y = ground.y + ground.height / 2;
-	this.speed = 5;
+	this.speed = 10;
 	this.velocityX = this.speed;
 	this.velocityY = 0;
 	this.color = '#ff0000';
@@ -230,10 +244,10 @@ function Ball(ground, players) {
 				this.velocityX = direction * this.speed * Math.cos(angleRad);
 				this.velocityY = this.speed * Math.sin(angleRad);
 				this.setSpeed(this.speed + 0.1);
-				setComputerLevel(computerLevel + 0.001);
+				//setComputerLevel(computerLevel + 0.001);
 			}
 		}
-		//Point logic
+		//Score logic
 		if (this.x + this.radius >= ground.x + ground.width || this.x - this.radius <= ground.x) {
 			isPaused = true;
 			if (this.x < canvas.width / 2) {
@@ -247,9 +261,10 @@ function Ball(ground, players) {
 	this.reset = function() {
 		this.x = ground.x + ground.width / 2;
 		this.y = ground.y + ground.height / 2;
-		this.speed = 5;
+		this.speed = 10;
 		this.velocityX = this.speed;
 		this.velocityY = 0;
+		computerLevel=(ground.width/ground.height)/this.speed;
 	};
 }
 
@@ -315,3 +330,38 @@ function Player(number, ground) {
 
 //Onload calback to init function
 window.onload = init;
+
+
+
+
+
+
+
+
+
+
+
+//Tensorflow Implementation
+//Global variables
+var AI={};
+
+//Machine Learning Init
+function initML() {
+	console.log('ML start');
+	AI.isTraining=true;
+
+
+}
+
+
+function createModel() {
+	const model=new tf.sequential();
+	model.add(tf.layers.dense({units:256,inputShape:[8]}));
+	model.add(tf.layers.dense({units:512,inputShape:[256]}));
+	model.add(tf.layers.dense({units:256,inputShape:[512]}));
+	model.add(tf.layers.dense({units:3,inputShape:[256]}));
+	const learningRate = 0.001;
+	const optimizer = tf.train.adam(learningRate);
+	model.compile({loss:'meanSquaredError',optimizer:optimizer});
+	return model;
+}
