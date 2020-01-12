@@ -1,5 +1,5 @@
 //Global variable declaration
-var canvas, ctx, animateInterval, computerLevel, isPaused, b, g, p1, p2, DY, goTo;
+var canvas, ctx, animateInterval, computerLevel, isPaused, b, g, gH, gW, p1, p2, DY, goTo, playWithMouse;
 
 //Init function
 function init(e) {
@@ -8,8 +8,11 @@ function init(e) {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	isPaused = true;
-	g = new Ground(100, '#00f000');
-	computerLevel = (g.width/g.height)/10;
+	playWithMouse = false;
+	gH = 400;
+	gW = 800;
+	g = new Ground(gW, gH, '#00f000');
+	computerLevel = 0.1;
 
 	p1 = new Player(1, g);
 	p2 = new Player(2, g);
@@ -21,14 +24,21 @@ function init(e) {
 	//Listners
 	//Controles
 	window.onmousemove = function(e) {
-		if(AI.isTraining){
+		if (playWithMouse) {
 			p1.update(e.clientY);
-		}	
-	
+		}
 	};
 
 	//Keyboard Controls
-	window.onkeydown = onKeyDown;
+	window.onkeydown = function(e) {
+		//Toggle start on space bar or enter
+		if (!isPaused) {
+			DY = e.keyCode == 38 || e.keyCode == 87 ? -1 : e.keyCode == 40 || e.keyCode == 83 ? 1 : 0;
+		}
+		if (e.keyCode == 32 || e.keyCode == 13) {
+			toggleStart();
+		}
+	};
 	window.onkeyup = (e) => {
 		if (e.keyCode == 38 || e.keyCode == 87 || e.keyCode == 40 || e.keyCode == 83) {
 			DY = 0;
@@ -43,19 +53,14 @@ function init(e) {
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 		isPaused = true;
-		g.reset();
+		g.reset(gW, gH);
 		b.reset();
 		p1.reset();
 		p2.reset();
 	}
 
-
-
-
 	//ML initilization call
 	initML();
-
-
 }
 //Animation loop
 function animate() {
@@ -63,6 +68,7 @@ function animate() {
 
 	//Drawing calls
 	g.draw();
+	com.draw();
 	p1.drawScore();
 	p2.drawScore();
 	b.draw();
@@ -70,25 +76,23 @@ function animate() {
 	p2.draw();
 	//Update Calls
 	if (!isPaused) {
+		com.collectData();
 		b.update();
-		p1.update(p1.y + DY * computerLevel * 50);
-		p2.update(p2.y + (b.y - p2.y) * computerLevel);
+		p1.update(p1.y + DY * computerLevel * b.speed * 8);
+		
+		if(com.isTraining){
+			p2.update(p2.y + (b.y - p2.y) * computerLevel + 0.05);
+		}else{
+			let tdy=com.predict();
+			p2.update(p2.y + -1 * tdy * computerLevel * b.speed * 8);
+			
+		}
 	}
 
 	//Recurr animate function
 	requestAnimationFrame(animate);
 }
 //Global functions
-
-function onKeyDown(e){
-	//Toggle start on space bar or enter
-	if (!isPaused) {
-		DY = e.keyCode == 38 || e.keyCode == 87 ? -1 : e.keyCode == 40 || e.keyCode == 83 ? 1 : 0;
-	}
-	if (e.keyCode == 32 || e.keyCode == 13) {
-		toggleStart();
-	}
-}
 
 //Pause and play
 function toggleStart() {
@@ -128,13 +132,21 @@ function intersects(circle, rect) {
 }
 
 //Ground class
-function Ground(margin, color) {
-	this.margin = margin;
-	this.x = window.innerWidth - 200 >= 800 ? (window.innerWidth - 800) / 2 : margin;
-	this.y = margin;
-	this.width = window.innerWidth - 200 >= 800 ? 800 : window.innerWidth - 2 * margin;
-	this.height = window.innerHeight - 2 * margin;
+function Ground(width, height, color) {
+	this.marginX;
+	this.marginY;
+	this.x;
+	this.y;
+	this.width = width;
+	this.height = height;
 	this.color = color;
+	this.reset = function(width, height) {
+		this.marginX = (window.innerWidth - width) / 2;
+		this.marginY = (window.innerHeight - height) / 2;
+		this.x = this.marginX;
+		this.y = this.marginY;
+	};
+	this.reset(width, height);
 	this.draw = function() {
 		ctx.beginPath();
 		ctx.fillStyle = this.color;
@@ -147,38 +159,33 @@ function Ground(margin, color) {
 		ctx.closePath();
 		ctx.beginPath();
 		ctx.fillStyle = '#ffffff';
-		for (var i = this.y - 100; i <= this.height + 100; i += 15) {
+		for (var i = this.y - 10; i < this.y + this.height - 15; i += 15) {
 			ctx.rect(this.x + this.width / 2 - 2, i + 10, 4, 10);
 		}
 		ctx.fill();
-		ctx.fillText('PONG', this.x + this.width / 2, this.margin + this.height - 20);
-	};
-	this.reset = function() {
-		this.height = window.innerHeight <= 500 ? 300 : window.innerHeight - 2 * margin;
-		this.x = window.innerWidth - 200 >= 800 ? (window.innerWidth - 800) / 2 : margin;
-		this.width =
-			window.innerWidth - 200 >= 800 ? 800 : window.innerWidth <= 500 ? 300 : window.innerWidth - 2 * margin;
+		ctx.fillText('PONG', this.x + this.width / 2, this.marginY + this.height - 20);
 	};
 }
 
 //Ball class
 function Ball(ground, players) {
 	this.radius = ground.height * 0.03;
-	this.x = ground.x + ground.width / 2;
-	this.y = ground.y + ground.height / 2;
-	this.speed = 10;
-	this.velocityX = this.speed;
-	this.velocityY = 0;
+	this.x;
+	this.y;
+	this.speed;
+	this.velocityX;
+	this.velocityY;
 	this.color = '#ff0000';
 	this.players = players;
-	//test
-	// 	this.radius = 14;
-	//  this.speed = 5;
-	// 	this.x = 340;
-	// 	this.y = 300;
-	// 	this.velocityX = -0.5;
-	// 	this.velocityY = -0.5;
-	//
+	this.reset = function() {
+		this.x = g.x + g.width / 2;
+		this.y = g.y + g.height / 2;
+		this.speed = 10;
+		this.velocityX = this.speed;
+		this.velocityY = 0;
+		computerLevel = 0.1;
+	};
+	this.reset();
 	this.setSpeed = function(newSpeed) {
 		if (newSpeed < players[0].width - 0.1) {
 			this.speed = newSpeed;
@@ -244,27 +251,28 @@ function Ball(ground, players) {
 				this.velocityX = direction * this.speed * Math.cos(angleRad);
 				this.velocityY = this.speed * Math.sin(angleRad);
 				this.setSpeed(this.speed + 0.1);
-				//setComputerLevel(computerLevel + 0.001);
+				setComputerLevel(computerLevel + 0.001);
 			}
 		}
 		//Score logic
 		if (this.x + this.radius >= ground.x + ground.width || this.x - this.radius <= ground.x) {
 			isPaused = true;
+			//if computer wins
 			if (this.x < canvas.width / 2) {
 				players[1].score++;
 			} else {
 				players[0].score++;
+				if(com.isTraining){
+					if(com.playCount>0){
+						com.playCount--;
+					}else if(com.playCount==0){
+						com.trainModel();
+						com.isTraining=false;
+					}
+				}
 			}
 			this.reset();
 		}
-	};
-	this.reset = function() {
-		this.x = ground.x + ground.width / 2;
-		this.y = ground.y + ground.height / 2;
-		this.speed = 10;
-		this.velocityX = this.speed;
-		this.velocityY = 0;
-		computerLevel=(ground.width/ground.height)/this.speed;
 	};
 }
 
@@ -274,17 +282,16 @@ function Player(number, ground) {
 	this.y;
 	this.width = ground.height * 0.05;
 	this.height = ground.height * 0.25;
-	this.speed = 3;
 	this.number = number;
 	this.score = 0;
 	this.color;
 	if (number == 1) {
 		this.x = ground.x + this.width / 2 + 2;
-		this.y = ground.height / 2 + ground.margin + this.height / 2 - this.height / 2;
+		this.y = ground.height / 2 + ground.marginY + this.height / 2 - this.height / 2;
 		this.color = '#f0f0f0';
 	} else if (number == 2) {
 		this.x = ground.x + ground.width - (2 + this.width / 2);
-		this.y = ground.height / 2 + ground.margin;
+		this.y = ground.height / 2 + ground.marginY;
 		this.color = '#0f0f0f';
 	} else {
 		console.error('Player number is not valid : ' + number);
@@ -309,19 +316,19 @@ function Player(number, ground) {
 		ctx.fillStyle = '#ffffff';
 		ctx.textAlign = 'center';
 		if (this.number == 1) {
-			ctx.fillText(this.score, ground.x + ground.width / 4, ground.margin * 2);
+			ctx.fillText(this.score, ground.x + ground.width / 4, ground.marginY + 100);
 		} else {
-			ctx.fillText(this.score, ground.x + 3 * ground.width / 4, ground.margin * 2);
+			ctx.fillText(this.score, ground.x + 3 * ground.width / 4, ground.marginY + 100);
 		}
 	};
 	this.reset = function() {
-		this.height = ground.height * 0.15;
+		this.height = ground.height * 0.25;
 		if (this.number == 1) {
 			this.x = ground.x + this.width / 2 + 2;
-			this.y = ground.height / 2 + ground.margin + this.height / 2 - this.height / 2;
+			this.y = ground.height / 2 + ground.marginY + this.height / 2 - this.height / 2;
 		} else if (this.number == 2) {
 			this.x = ground.x + ground.width - (2 + this.width / 2);
-			this.y = ground.height / 2 + ground.margin;
+			this.y = ground.height / 2 + ground.marginY;
 		} else {
 			console.error('Player number is not valid : ' + number);
 		}
@@ -331,37 +338,126 @@ function Player(number, ground) {
 //Onload calback to init function
 window.onload = init;
 
-
-
-
-
-
-
-
-
-
-
 //Tensorflow Implementation
 //Global variables
-var AI={};
+var com;
+//AI Class
+function AI() {
+	this.isTraining;
+	this.previousData;
+	this.currentData;
+	this.currentPrediction;
+	this.playCount;
+	this.dataXs = [];
+	this.dataYs = [];
+	this.direction=[0.2,0.2,0.2];
+	this.model = createModel();
+
+	//Functions
+	this.nextData = function() {
+		if ((playCount = 0)) {
+			this.isTraining = false;
+			this.previousData = null;
+		}
+		this.playCount--;
+	};
+	this.reset = function() {
+		this.isTraining = true;
+		this.previousData = null;
+		this.currentData = null;
+		this.currentPrediction = 0;
+		this.playCount = 2;
+	};
+	this.reset();
+	this.collectData = function() {
+		if (!isPaused) {
+			if (this.previousData == null) {
+				this.previousData = this.isTraining
+					? [ b.x, b.y, p1.y, p2.y ]
+					: [ g.width - b.x, g.height - b.y, g.height - p1.y, g.height - p2.y ];
+				return;
+			}
+			this.currentData = this.isTraining
+				? [ b.x, b.y, p1.y, p2.y ]
+				: [ g.width - b.x, g.height - b.y, g.height - p1.y, g.height - p2.y ];
+			if(this.isTraining){
+				this.dataXs.push([ ...this.currentData, ...this.previousData ]);
+				this.dataYs.push([DY==-1?1:0,DY==0?1:0,DY==1?1:0]);
+			}
+			
+			this.previousData=this.currentData;
+		}
+	};
+	this.trainModel = function() {
+		//Data format [ballx,bally,playery,computery,previousballx,previousbally,previousplayery,previouscomputery]
+		//Preparing data for training
+		//Normalization of Data
+		console.log('Preparing Data to Train');
+		let minX = g.x;
+		let maxX = g.x + g.width;
+		let minY = g.y;
+		let maxY = g.y + g.height;
+		let newDataXs = this.dataXs.map((currentData) => {
+			return currentData.map((value, index) => {
+				let min;
+				let max;
+				if (index == 0 || index == 4) {
+					//if Preparing Y values
+					min = minX;
+					max = maxX;
+				} else {
+					//if Preparing X values
+					min = minY;
+					max = maxY;
+				}
+				return (value - min) / (max - min);
+			});
+		});
+		//Start training
+		console.log('Started training');
+		let thisO = this;
+		(async function(){
+			let result = await thisO.model.fit(tf.tensor(newDataXs),tf.tensor(thisO.dataYs));		
+		}());
+		console.log('trained');
+		
+
+	};
+
+	this.predict = function() {
+		let value = com.model.predict(tf.tensor([[...this.currentData,...this.previousData]])).argMax(1);
+		this.currentPrediction = value.dataSync()[0]-1;
+		return this.currentPrediction;
+	};
+	this.draw=function(){
+		ctx.beginPath();
+		ctx.fillStyle = `rgba(0,0,0,${this.direction[0]})`;
+		ctx.arc(window.innerWidth-50, g.y+50, 20, 0, 2 * Math.PI);
+		ctx.fillStyle = `rgba(0,0,0,${this.direction[1]})`;
+		ctx.arc(window.innerWidth-50, g.y+100, 20, 0, 2 * Math.PI);
+		ctx.fillStyle = `rgba(0,0,0,${this.direction[2]}`;
+		ctx.arc(window.innerWidth-50, g.y+150, 20, 0, 2 * Math.PI);
+		ctx.fill();
+		ctx.closePath();
+	};
+}
 
 //Machine Learning Init
 function initML() {
 	console.log('ML start');
-	AI.isTraining=true;
-
+	//Creating ML Object
+	com = new AI();
 
 }
 
-
 function createModel() {
-	const model=new tf.sequential();
-	model.add(tf.layers.dense({units:256,inputShape:[8]}));
-	model.add(tf.layers.dense({units:512,inputShape:[256]}));
-	model.add(tf.layers.dense({units:256,inputShape:[512]}));
-	model.add(tf.layers.dense({units:3,inputShape:[256]}));
+	const model = new tf.sequential();
+	model.add(tf.layers.dense({ units: 256, inputShape: [ 8 ] }));
+	model.add(tf.layers.dense({ units: 512, inputShape: [ 256 ] }));
+	model.add(tf.layers.dense({ units: 256, inputShape: [ 512 ] }));
+	model.add(tf.layers.dense({ units: 3, inputShape: [ 256 ] }));
 	const learningRate = 0.001;
 	const optimizer = tf.train.adam(learningRate);
-	model.compile({loss:'meanSquaredError',optimizer:optimizer});
+	model.compile({ loss: 'meanSquaredError', optimizer: optimizer });
 	return model;
 }
