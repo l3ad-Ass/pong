@@ -3,6 +3,7 @@ var canvas, ctx, animateInterval, computerLevel, isPaused, b, g, gH, gW, p1, p2,
 
 //Init function
 function init(e) {
+	console.log('Game Start');
 	canvas = document.getElementById('screen');
 	ctx = canvas.getContext('2d');
 	canvas.width = window.innerWidth;
@@ -65,10 +66,12 @@ function init(e) {
 //Animation loop
 function animate() {
 	ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
+	
 	//Drawing calls
 	g.draw();
-	com.draw();
+	if (!com.isTraining) {
+		com.draw();
+	}
 	p1.drawScore();
 	p2.drawScore();
 	b.draw();
@@ -79,13 +82,12 @@ function animate() {
 		com.collectData();
 		b.update();
 		p1.update(p1.y + DY * computerLevel * b.speed * 8);
-		
-		if(com.isTraining){
+
+		if (com.isTraining) {
 			p2.update(p2.y + (b.y - p2.y) * computerLevel + 0.05);
-		}else{
-			let tdy=com.predict();
+		} else {
+			let tdy = com.predict();
 			p2.update(p2.y + -1 * tdy * computerLevel * b.speed * 8);
-			
 		}
 	}
 
@@ -262,13 +264,13 @@ function Ball(ground, players) {
 				players[1].score++;
 			} else {
 				players[0].score++;
-				if(com.isTraining){
-					if(com.playCount>0){
-						com.playCount--;
-					}else if(com.playCount==0){
-						com.trainModel();
-						com.isTraining=false;
-					}
+			}
+			if (com.isTraining) {
+				if (com.playCount > 0) {
+					com.playCount--;
+				} else if (com.playCount == 0) {
+					com.trainModel();
+					com.isTraining = false;
 				}
 			}
 			this.reset();
@@ -284,14 +286,17 @@ function Player(number, ground) {
 	this.height = ground.height * 0.25;
 	this.number = number;
 	this.score = 0;
+	this.image = new Image();
 	this.color;
 	if (number == 1) {
 		this.x = ground.x + this.width / 2 + 2;
 		this.y = ground.height / 2 + ground.marginY + this.height / 2 - this.height / 2;
+		this.image.src = './assets/mylogo.png';
 		this.color = '#f0f0f0';
 	} else if (number == 2) {
 		this.x = ground.x + ground.width - (2 + this.width / 2);
 		this.y = ground.height / 2 + ground.marginY;
+		this.image.src = './assets/code.png';
 		this.color = '#0f0f0f';
 	} else {
 		console.error('Player number is not valid : ' + number);
@@ -315,10 +320,33 @@ function Player(number, ground) {
 		ctx.font = '100px Comic Sans M';
 		ctx.fillStyle = '#ffffff';
 		ctx.textAlign = 'center';
+		let logoSize=120;
 		if (this.number == 1) {
 			ctx.fillText(this.score, ground.x + ground.width / 4, ground.marginY + 100);
+			ctx.drawImage(
+				this.image,
+				0,
+				0,
+				500,
+				500,
+				ground.x - logoSize/2 + ground.width / 4,
+				ground.y + ground.height / 2 - logoSize/2,
+				logoSize,
+				logoSize
+			);
 		} else {
 			ctx.fillText(this.score, ground.x + 3 * ground.width / 4, ground.marginY + 100);
+			ctx.drawImage(
+				this.image,
+				0,
+				0,
+				500,
+				500,
+				ground.x - logoSize/2 + 3 * ground.width / 4,
+				ground.y + ground.height / 2 - logoSize/2,
+				logoSize,
+				logoSize
+			);
 		}
 	};
 	this.reset = function() {
@@ -348,9 +376,12 @@ function AI() {
 	this.currentData;
 	this.currentPrediction;
 	this.playCount;
+	this.neuronFill = 'skyblue';
+	this.neuronStroke = 'blue';
+	this.maxOpacity = 0.8;
+	this.minOpacity = 0.2;
 	this.dataXs = [];
 	this.dataYs = [];
-	this.direction=[0.2,0.2,0.2];
 	this.model = createModel();
 
 	//Functions
@@ -366,33 +397,36 @@ function AI() {
 		this.previousData = null;
 		this.currentData = null;
 		this.currentPrediction = 0;
-		this.playCount = 2;
+		this.playCount = 1;
 	};
 	this.reset();
 	this.collectData = function() {
-		if (!isPaused) {
-			if (this.previousData == null) {
-				this.previousData = this.isTraining
-					? [ b.x, b.y, p1.y, p2.y ]
-					: [ g.width - b.x, g.height - b.y, g.height - p1.y, g.height - p2.y ];
-				return;
-			}
-			this.currentData = this.isTraining
+		if (this.isTraining) {
+			console.log('Collecting data');
+		}
+		if (this.previousData == null) {
+			this.previousData = this.isTraining
 				? [ b.x, b.y, p1.y, p2.y ]
 				: [ g.width - b.x, g.height - b.y, g.height - p1.y, g.height - p2.y ];
-			if(this.isTraining){
-				this.dataXs.push([ ...this.currentData, ...this.previousData ]);
-				this.dataYs.push([DY==-1?1:0,DY==0?1:0,DY==1?1:0]);
-			}
-			
-			this.previousData=this.currentData;
+			return;
 		}
+		this.currentData = this.isTraining
+			? [ b.x, b.y, p1.y, p2.y ]
+			: [ g.width - b.x, g.height - b.y, g.height - p1.y, g.height - p2.y ];
+		if (this.isTraining) {
+			this.dataXs.push([ ...this.currentData, ...this.previousData ]);
+			this.dataYs.push([ DY == -1 ? 1 : 0, DY == 0 ? 1 : 0, DY == 1 ? 1 : 0 ]);
+		}
+
+		this.previousData = this.currentData;
 	};
 	this.trainModel = function() {
 		//Data format [ballx,bally,playery,computery,previousballx,previousbally,previousplayery,previouscomputery]
 		//Preparing data for training
 		//Normalization of Data
+		p2.image.src = './assets/neural_network.png';
 		console.log('Preparing Data to Train');
+		console.log('Normalizing Data');
 		let minX = g.x;
 		let maxX = g.x + g.width;
 		let minY = g.y;
@@ -414,31 +448,47 @@ function AI() {
 			});
 		});
 		//Start training
-		console.log('Started training');
+		console.log('Fitting data ');
 		let thisO = this;
-		(async function(){
-			let result = await thisO.model.fit(tf.tensor(newDataXs),tf.tensor(thisO.dataYs));		
-		}());
-		console.log('trained');
-		
-
+		(async function() {
+			let result = await thisO.model.fit(tf.tensor(newDataXs), tf.tensor(thisO.dataYs));
+		})();
+		console.log('Model training completed');
 	};
 
 	this.predict = function() {
-		let value = com.model.predict(tf.tensor([[...this.currentData,...this.previousData]])).argMax(1);
-		this.currentPrediction = value.dataSync()[0]-1;
+		console.log('Predicting next move');
+		let value = com.model.predict(tf.tensor([ [ ...this.currentData, ...this.previousData ] ])).argMax(1);
+		this.currentPrediction = value.dataSync()[0] - 1;
 		return this.currentPrediction;
 	};
-	this.draw=function(){
+	this.draw = function() {
+		ctx.fillStyle = this.neuronFill;
+		ctx.strokeStyle = this.neuronStroke;
 		ctx.beginPath();
-		ctx.fillStyle = `rgba(0,0,0,${this.direction[0]})`;
-		ctx.arc(window.innerWidth-50, g.y+50, 20, 0, 2 * Math.PI);
-		ctx.fillStyle = `rgba(0,0,0,${this.direction[1]})`;
-		ctx.arc(window.innerWidth-50, g.y+100, 20, 0, 2 * Math.PI);
-		ctx.fillStyle = `rgba(0,0,0,${this.direction[2]}`;
-		ctx.arc(window.innerWidth-50, g.y+150, 20, 0, 2 * Math.PI);
+		ctx.globalAlpha = this.currentPrediction == 1 ? this.maxOpacity : this.minOpacity;
+		ctx.arc(g.x + g.width - 50, g.y + 50, 20, 0, 2 * Math.PI);
+		ctx.stroke();
+		ctx.arc(g.x + g.width - 50, g.y + 50, 20, 0, 2 * Math.PI);
 		ctx.fill();
 		ctx.closePath();
+		ctx.beginPath();
+		ctx.globalAlpha = this.currentPrediction == 0 ? this.maxOpacity : this.minOpacity;
+		ctx.arc(g.x + g.width - 50, g.y + 100, 20, 0, 2 * Math.PI);
+		ctx.stroke();
+		ctx.arc(g.x + g.width - 50, g.y + 100, 20, 0, 2 * Math.PI);
+		ctx.fill();
+		ctx.closePath();
+		ctx.beginPath();
+		ctx.globalAlpha = this.currentPrediction == -1 ? this.maxOpacity : this.minOpacity;
+
+		ctx.arc(g.x + g.width - 50, g.y + 150, 20, 0, 2 * Math.PI);
+		ctx.stroke();
+		ctx.arc(g.x + g.width - 50, g.y + 150, 20, 0, 2 * Math.PI);
+		ctx.fill();
+		ctx.closePath();
+		ctx.strokeStyle = 'black';
+		ctx.globalAlpha = 1;
 	};
 }
 
@@ -447,7 +497,6 @@ function initML() {
 	console.log('ML start');
 	//Creating ML Object
 	com = new AI();
-
 }
 
 function createModel() {
